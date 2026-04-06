@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "SGW"
 copyright = "2026, Sijie Chen"
 author = "Sijie Chen"
-release = "0.1.0"
+release = "0.3.0"
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -30,11 +30,9 @@ html_context = {
 }
 html_theme_options = {
     "logo_only": True,
-    "display_version": True,
     "navigation_depth": 3,
 }
 html_logo = "logo.svg"
-html_static_path = ["_static"]
 
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
