@@ -1,169 +1,93 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 160" width="620" height="160">
   <defs>
-    <!-- Gradients -->
-    <linearGradient id="frame-grad" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" stop-color="#00d4ff"/>
-      <stop offset="50%" stop-color="#7c3aed"/>
+    <linearGradient id="arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22d3ee"/>
       <stop offset="100%" stop-color="#f59e0b"/>
     </linearGradient>
-    <linearGradient id="frame-grad-dim" x1="0%" y1="50%" x2="100%" y2="50%">
-      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.3"/>
-      <stop offset="50%" stop-color="#7c3aed" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.3"/>
-    </linearGradient>
-    <linearGradient id="arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.8"/>
-      <stop offset="50%" stop-color="#a78bfa" stop-opacity="0.5"/>
-      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.8"/>
-    </linearGradient>
-    <radialGradient id="cyan-node">
+    <radialGradient id="src-grad">
       <stop offset="0%" stop-color="#67e8f9"/>
       <stop offset="100%" stop-color="#0891b2"/>
     </radialGradient>
-    <radialGradient id="amber-node">
+    <radialGradient id="tgt-grad">
       <stop offset="0%" stop-color="#fde68a"/>
       <stop offset="100%" stop-color="#d97706"/>
     </radialGradient>
-    <linearGradient id="streak-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0"/>
-      <stop offset="30%" stop-color="#00d4ff" stop-opacity="0.15"/>
-      <stop offset="70%" stop-color="#f59e0b" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0"/>
-    </linearGradient>
-
-    <!-- Glow filters -->
     <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-      <feFlood flood-color="#00d4ff" flood-opacity="0.6" result="color"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+      <feFlood flood-color="#22d3ee" flood-opacity="0.5" result="color"/>
       <feComposite in="color" in2="blur" operator="in" result="glow"/>
-      <feMerge>
-        <feMergeNode in="glow"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
     <filter id="glow-amber" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-      <feFlood flood-color="#f59e0b" flood-opacity="0.6" result="color"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+      <feFlood flood-color="#f59e0b" flood-opacity="0.5" result="color"/>
       <feComposite in="color" in2="blur" operator="in" result="glow"/>
-      <feMerge>
-        <feMergeNode in="glow"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="glow-frame" x="-10%" y="-10%" width="120%" height="120%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="glow-text" x="-5%" y="-5%" width="110%" height="110%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
   <!-- Background -->
-  <g id="background">
-    <rect width="1600" height="900" fill="#070b14"/>
-    <rect width="1600" height="900" fill="#0a1628" rx="0"/>
-    <!-- Subtle vignette -->
-    <ellipse cx="800" cy="450" rx="900" ry="500" fill="none" stroke="#0f172a" stroke-width="200" opacity="0.5"/>
-  </g>
+  <rect width="620" height="160" rx="16" fill="#0f172a"/>
 
-  <!-- Badge frame (oval neon border) -->
-  <g id="badge-frame" transform="translate(800, 280)">
-    <!-- Outer glow -->
-    <ellipse cx="0" cy="0" rx="360" ry="200" fill="none"
-             stroke="url(#frame-grad-dim)" stroke-width="40" opacity="0.4"/>
-    <!-- Main frame -->
-    <ellipse cx="0" cy="0" rx="360" ry="200" fill="none"
-             stroke="url(#frame-grad)" stroke-width="2.5" opacity="0.9"
-             filter="url(#glow-frame)"/>
-    <!-- Inner fill -->
-    <ellipse cx="0" cy="0" rx="355" ry="196" fill="#070b14" opacity="0.85"/>
-  </g>
-
-  <!-- Left graph (cyan) — 5 nodes -->
+  <!-- Source graph (left cluster) -->
   <g id="left-graph" filter="url(#glow-cyan)">
-    <!-- Edges -->
-    <line x1="560" y1="210" x2="530" y2="270" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="560" y1="210" x2="610" y2="250" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="530" y1="270" x2="580" y2="310" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="610" y1="250" x2="580" y2="310" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="530" y1="270" x2="550" y2="350" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="580" y1="310" x2="550" y2="350" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <line x1="610" y1="250" x2="560" y2="210" stroke="#0891b2" stroke-width="1.8" opacity="0.6"/>
-    <!-- Nodes -->
-    <circle cx="560" cy="210" r="8" fill="url(#cyan-node)"/>
-    <circle cx="530" cy="270" r="9" fill="url(#cyan-node)"/>
-    <circle cx="610" cy="250" r="7" fill="url(#cyan-node)"/>
-    <circle cx="580" cy="310" r="8.5" fill="url(#cyan-node)"/>
-    <circle cx="550" cy="350" r="7.5" fill="url(#cyan-node)"/>
+    <line x1="42" y1="48" x2="62" y2="76" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="62" y1="76" x2="38" y2="103" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="42" y1="48" x2="78" y2="43" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="78" y1="43" x2="90" y2="70" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="62" y1="76" x2="90" y2="70" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="90" y1="70" x2="85" y2="106" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="38" y1="103" x2="85" y2="106" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="38" y1="103" x2="58" y2="123" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <line x1="58" y1="123" x2="85" y2="106" stroke="#0891b2" stroke-width="1.2" opacity="0.6"/>
+    <circle cx="42" cy="48" r="5" fill="url(#src-grad)"/>
+    <circle cx="78" cy="43" r="4.5" fill="url(#src-grad)"/>
+    <circle cx="62" cy="76" r="5.5" fill="url(#src-grad)"/>
+    <circle cx="90" cy="70" r="4" fill="url(#src-grad)"/>
+    <circle cx="38" cy="103" r="5" fill="url(#src-grad)"/>
+    <circle cx="85" cy="106" r="4.5" fill="url(#src-grad)"/>
+    <circle cx="58" cy="123" r="4" fill="url(#src-grad)"/>
   </g>
 
-  <!-- Right graph (amber) — 8 nodes -->
-  <g id="right-graph" filter="url(#glow-amber)">
-    <!-- Edges -->
-    <line x1="990" y1="195" x2="1030" y2="230" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1030" y1="230" x2="1060" y2="205" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1030" y1="230" x2="1010" y2="280" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1060" y1="205" x2="1050" y2="265" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1010" y1="280" x2="1050" y2="265" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1010" y1="280" x2="980" y2="320" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1050" y1="265" x2="1040" y2="320" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="980" y1="320" x2="1040" y2="320" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="980" y1="320" x2="1000" y2="365" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1040" y1="320" x2="1020" y2="365" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <line x1="1000" y1="365" x2="1020" y2="365" stroke="#d97706" stroke-width="1.8" opacity="0.6"/>
-    <!-- Nodes -->
-    <circle cx="990" cy="195" r="7" fill="url(#amber-node)"/>
-    <circle cx="1030" cy="230" r="8" fill="url(#amber-node)"/>
-    <circle cx="1060" cy="205" r="6.5" fill="url(#amber-node)"/>
-    <circle cx="1010" cy="280" r="8.5" fill="url(#amber-node)"/>
-    <circle cx="1050" cy="265" r="7" fill="url(#amber-node)"/>
-    <circle cx="980" cy="320" r="7.5" fill="url(#amber-node)"/>
-    <circle cx="1040" cy="320" r="7" fill="url(#amber-node)"/>
-    <circle cx="1010" cy="365" r="8" fill="url(#amber-node)"/>
-  </g>
-
-  <!-- Correspondence lines (dashed curves) -->
+  <!-- Transport arcs -->
   <g id="correspondence-lines">
-    <path d="M 560,210 C 700,170 860,165 990,195"
-          stroke="url(#arc-grad)" stroke-width="2" fill="none" stroke-dasharray="8,5" opacity="0.7"/>
-    <path d="M 610,250 C 730,210 900,215 1030,230"
-          stroke="url(#arc-grad)" stroke-width="1.8" fill="none" stroke-dasharray="8,5" opacity="0.6"/>
-    <path d="M 580,310 C 720,275 880,270 1010,280"
-          stroke="url(#arc-grad)" stroke-width="1.8" fill="none" stroke-dasharray="8,5" opacity="0.55"/>
-    <path d="M 530,270 C 680,240 850,250 1050,265"
-          stroke="url(#arc-grad)" stroke-width="1.5" fill="none" stroke-dasharray="8,5" opacity="0.45"/>
-    <path d="M 550,350 C 700,340 870,335 1010,365"
-          stroke="url(#arc-grad)" stroke-width="1.5" fill="none" stroke-dasharray="8,5" opacity="0.5"/>
+    <path d="M 90,70 Q 145,18 200,53" stroke="url(#arc-grad)" stroke-width="2" fill="none" stroke-dasharray="6,3" opacity="0.9"/>
+    <path d="M 85,106 Q 145,73 205,83" stroke="url(#arc-grad)" stroke-width="1.5" fill="none" stroke-dasharray="6,3" opacity="0.7"/>
+    <path d="M 62,76 Q 140,48 210,68" stroke="url(#arc-grad)" stroke-width="1.5" fill="none" stroke-dasharray="6,3" opacity="0.6"/>
+    <polygon points="198,52 205,50 200,57" fill="#f59e0b" opacity="0.9"/>
+    <polygon points="203,82 210,80 205,87" fill="#f59e0b" opacity="0.7"/>
+    <polygon points="208,67 215,65 210,72" fill="#f59e0b" opacity="0.6"/>
   </g>
 
-  <!-- Horizontal light streaks (80s aesthetic) -->
-  <g id="streaks" opacity="0.6">
-    <rect x="300" y="555" width="1000" height="1" fill="url(#streak-grad)" rx="0.5"/>
-    <rect x="350" y="565" width="900" height="0.8" fill="url(#streak-grad)" rx="0.4" opacity="0.4"/>
-    <rect x="400" y="575" width="800" height="0.6" fill="url(#streak-grad)" rx="0.3" opacity="0.25"/>
+  <!-- Target graph (right cluster) -->
+  <g id="right-graph" filter="url(#glow-amber)">
+    <line x1="200" y1="53" x2="220" y2="38" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="220" y1="38" x2="240" y2="56" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="200" y1="53" x2="210" y2="68" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="210" y1="68" x2="240" y2="56" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="205" y1="83" x2="210" y2="68" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="205" y1="83" x2="230" y2="98" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="230" y1="98" x2="240" y2="56" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="230" y1="98" x2="215" y2="116" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <line x1="205" y1="83" x2="215" y2="116" stroke="#d97706" stroke-width="1.2" opacity="0.6"/>
+    <circle cx="200" cy="53" r="5" fill="url(#tgt-grad)"/>
+    <circle cx="220" cy="38" r="4" fill="url(#tgt-grad)"/>
+    <circle cx="240" cy="56" r="4.5" fill="url(#tgt-grad)"/>
+    <circle cx="210" cy="68" r="5" fill="url(#tgt-grad)"/>
+    <circle cx="205" cy="83" r="5.5" fill="url(#tgt-grad)"/>
+    <circle cx="230" cy="98" r="4" fill="url(#tgt-grad)"/>
+    <circle cx="215" cy="116" r="4.5" fill="url(#tgt-grad)"/>
   </g>
 
-  <!-- Main title -->
-  <g id="title" text-anchor="middle" filter="url(#glow-text)">
-    <text x="800" y="660" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
-          font-size="140" font-weight="900" letter-spacing="8">
-      <tspan fill="#f59e0b">Torch</tspan><tspan fill="#bae6fd">GW</tspan>
-    </text>
-  </g>
+  <!-- Divider -->
+  <line x1="275" y1="30" x2="275" y2="130" stroke="#334155" stroke-width="1" opacity="0.4"/>
 
-  <!-- Subtitle -->
-  <g id="subtitle" text-anchor="middle">
-    <text x="800" y="720" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
-          font-size="28" fill="#7dd3fc" letter-spacing="10" opacity="0.85">GROMOV-WASSERSTEIN ON GRAPHS</text>
-    <text x="800" y="760" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
-          font-size="22" fill="#94a3b8" letter-spacing="12" opacity="0.6">GPU ACCELERATED</text>
-  </g>
+  <!-- Title -->
+  <text x="300" y="78" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="2">
+    <tspan fill="#f59e0b">Torch</tspan><tspan fill="#bae6fd">GW</tspan>
+  </text>
+  <text x="300" y="106" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="12" fill="#7dd3fc" letter-spacing="2.5" opacity="0.85">GROMOV-WASSERSTEIN ON GRAPHS</text>
+  <text x="300" y="126" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="11" fill="#64748b" letter-spacing="0.5">GPU accelerated · Pure PyTorch</text>
 </svg>
