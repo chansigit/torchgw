@@ -21,7 +21,7 @@ myst_enable_extensions = ["colon_fence", "deflist"]
 
 templates_path = ["_templates"]
 html_static_path = ["_static"]
-html_extra_path = ["_static/robots.txt"]
+html_extra_path = ["_static/robots.txt", "_static/google17f7d289fafbfd7f.html"]
 exclude_patterns = ["_build"]
 
 html_theme = "sphinx_rtd_theme"
@@ -44,7 +44,7 @@ html_meta = {
     "description": "TorchGW — Fast Sampled Gromov-Wasserstein optimal transport solver in pure PyTorch. GPU-accelerated with Triton fused Sinkhorn kernels, mixed precision, and smart early stopping. 3-175x faster than POT.",
     "keywords": "Gromov-Wasserstein, optimal transport, PyTorch, Sinkhorn, graph matching, manifold alignment, single-cell, Triton, GPU",
     "author": "Sijie Chen",
-    "google-site-verification": "",  # fill in after registering with Google Search Console
+    "google-site-verification": "google17f7d289fafbfd7f",
 }
 
 # Generate sitemap.xml for search engine crawling
