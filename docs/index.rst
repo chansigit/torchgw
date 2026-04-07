@@ -44,7 +44,7 @@ single-cell multi-omics integration, and cross-domain graph matching.
 
 **Key features:**
 
-- **3–175x faster than POT** on typical workloads (spiral 4000×5000: 1s vs 183s)
+- **Up to 175x faster than POT** on typical workloads (spiral 4000×5000: 1s vs 183s)
 - **Triton fused Sinkhorn** — single-pass online logsumexp, no intermediate N×K matrices
 - **Mixed precision** — float32 Sinkhorn + float64 output, zero quality loss
 - **Smart early stopping** — cost plateau detection, not just transport plan norm

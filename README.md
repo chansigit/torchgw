@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Pure PyTorch</b> &nbsp;|&nbsp; <b>Triton GPU Kernels</b> &nbsp;|&nbsp; <b>Differentiable</b> &nbsp;|&nbsp; <b>175x faster than POT</b>
+  <b>Pure PyTorch</b> &nbsp;|&nbsp; <b>Triton GPU Kernels</b> &nbsp;|&nbsp; <b>Differentiable</b> &nbsp;|&nbsp; <b>Up to 175x faster than POT</b>
 </p>
 
 ---
@@ -34,7 +34,7 @@ shape correspondence, manifold alignment.
 <td width="50%">
 
 **Performance**
-- 3-175x faster than [POT](https://pythonot.github.io/) on typical workloads
+- Up to 175x faster than [POT](https://pythonot.github.io/) on typical workloads
 - Triton fused Sinkhorn -- single-pass logsumexp, zero N*K intermediates
 - Mixed precision: float32 Sinkhorn + float64 output
 - Smart early stopping via cost plateau detection
@@ -111,7 +111,7 @@ Spiral (2D) to Swiss roll (3D) alignment on NVIDIA L40S:
 | 4000 vs 5000 | **TorchGW** precomputed | **5.1 s** | 0.998 |
 | 4000 vs 5000 | **TorchGW** landmark | **1.0 s** | 0.999 |
 
-> At 4000x5000 with landmark distances, TorchGW is **~175x faster** than POT with equal quality.
+> At 4000x5000 with landmark distances, TorchGW is **up to ~175x faster** than POT with equal quality.
 
 <details>
 <summary>Benchmark plots</summary>

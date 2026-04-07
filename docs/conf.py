@@ -42,7 +42,7 @@ html_baseurl = "https://chansigit.github.io/torchgw/"
 
 # SEO: meta tags for search engines
 html_meta = {
-    "description": "TorchGW — Fast Sampled Gromov-Wasserstein optimal transport solver in pure PyTorch. GPU-accelerated with Triton fused Sinkhorn kernels, mixed precision, and smart early stopping. 3-175x faster than POT.",
+    "description": "TorchGW — Fast Sampled Gromov-Wasserstein optimal transport solver in pure PyTorch. GPU-accelerated with Triton fused Sinkhorn kernels, mixed precision, and smart early stopping. Up to 175x faster than POT.",
     "keywords": "Gromov-Wasserstein, optimal transport, PyTorch, Sinkhorn, graph matching, manifold alignment, single-cell, Triton, GPU",
     "author": "Sijie Chen",
     "google-site-verification": "google17f7d289fafbfd7f",
