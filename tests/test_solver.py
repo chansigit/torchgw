@@ -348,6 +348,19 @@ def test_lowrank_mixed_precision(two_datasets):
     assert torch.all(T >= 0)
 
 
+def test_cost_plateau_early_stopping(two_datasets):
+    """Solver should stop early when GW cost plateaus, not run to max_iter."""
+    X_src, X_tgt = two_datasets
+    _, log_high = sampled_gw(X_src, X_tgt, s_shared=50, M=30,
+                             max_iter=500, min_iter_before_converge=20,
+                             log=True)
+    # With 500 max_iter but typical convergence, should stop well before 500
+    assert log_high["n_iter"] < 500, (
+        f"Expected early stopping but ran all {log_high['n_iter']} iterations"
+    )
+    assert log_high["n_iter"] >= 20  # must respect min_iter_before_converge
+
+
 def test_lowrank_semi_relaxed_early_error():
     """semi_relaxed should raise immediately, before any computation."""
     from torchgw import sampled_lowrank_gw

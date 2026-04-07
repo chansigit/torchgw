@@ -75,13 +75,13 @@ def sample_pairs_gpu(
         rng = np.random.default_rng()
         return rng.integers(0, N, size=M), rng.integers(0, K, size=M)
 
-    p_rows = p_rows / total
+    p_rows = (p_rows / total).float()  # multinomial requires float32
     rows = torch.multinomial(p_rows, M, replacement=True)
 
     # Column sampling per selected row
     row_probs = T[rows]  # (M, K)
     row_sums = row_probs.sum(dim=1, keepdim=True).clamp(min=1e-30)
-    row_probs = row_probs / row_sums
+    row_probs = (row_probs / row_sums).float()
     cols = torch.multinomial(row_probs, 1).squeeze(1)
 
     return rows.cpu().numpy(), cols.cpu().numpy()

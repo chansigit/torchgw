@@ -39,6 +39,8 @@ class DijkstraProvider:
     shortest-path computations when the same anchor nodes are re-sampled.
     """
 
+    _MAX_CACHE_ROWS = 2000  # per side; ~800MB at N=100k float32
+
     def __init__(self, graph_source: csr_matrix, graph_target: csr_matrix):
         self.graph_source = graph_source
         self.graph_target = graph_target
@@ -57,6 +59,9 @@ class DijkstraProvider:
         if len(uncached) > 0:
             D_new = _batch_dijkstra(graph, uncached, self._parallel)
             for i, s in enumerate(uncached):
+                # Evict oldest entry if cache is full
+                if len(cache) >= self._MAX_CACHE_ROWS:
+                    cache.pop(next(iter(cache)))
                 cache[s] = D_new[i].astype(np.float32)
 
         # Pre-allocate and fill (avoids list of arrays + vstack)

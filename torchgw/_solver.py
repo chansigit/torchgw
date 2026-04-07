@@ -77,7 +77,7 @@ def _sinkhorn_loop(
 
     done = 0
     while done < max_iter:
-        if use_compiled and not verbose:
+        if use_compiled:
             batch = min(check_every, max_iter - done)
             log_u, log_v = iter_fn(
                 log_K, log_a, log_b, log_u, log_v,
@@ -391,7 +391,8 @@ def _gw_loop(
             Lambda_gw = term_A + term_B + term_C
 
             # Lambda EMA: smooth cost matrix across iterations
-            if lambda_ema_beta is not None:
+            # beta=0.0 is treated as disabled (same as None)
+            if lambda_ema_beta is not None and lambda_ema_beta > 0:
                 if Lambda_ema is None:
                     Lambda_ema = Lambda_gw
                 else:
@@ -653,7 +654,7 @@ def sampled_gw(
         T_init = torch.outer(p_real, q_real)
 
     # C_linear on device
-    C_lin_device = C_linear_t.float().to(device) if C_linear_t is not None and fgw_alpha > 0 else None
+    C_lin_device = C_linear_t.to(dtype=torch.float64, device=device) if C_linear_t is not None and fgw_alpha > 0 else None
 
     # Sinkhorn function
     ctx = torch.no_grad() if not differentiable else torch.enable_grad()
@@ -795,7 +796,7 @@ def sampled_lowrank_gw(
         T_init = torch.outer(p_real, q_real)
 
     # C_linear on device
-    C_lin_device = C_linear_t.float().to(device) if C_linear_t is not None and fgw_alpha > 0 else None
+    C_lin_device = C_linear_t.to(dtype=torch.float64, device=device) if C_linear_t is not None and fgw_alpha > 0 else None
 
     # Wrap sinkhorn_lowrank with fixed rank/iteration params
     def _lr_sinkhorn(a, b, C, reg, semi_relaxed=False, rho=1.0, verbose=False):
