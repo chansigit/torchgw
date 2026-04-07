@@ -1,7 +1,12 @@
+import inspect
+
 import numpy as np
 from joblib import Parallel, delayed
 from scipy.sparse import csr_matrix, diags
 from scipy.sparse.linalg import svds, cg, LinearOperator
+
+# SciPy >= 1.12 renamed cg(tol=) to cg(rtol=); detect which to use.
+_CG_TOL_KEY = "rtol" if "rtol" in inspect.signature(cg).parameters else "tol"
 
 
 def joint_embedding(
@@ -62,7 +67,7 @@ def joint_embedding(
         d = block.diagonal().copy()
         d[d == 0] = 1.0
         precond = diags(1.0 / d)
-        x, _ = cg(block, v_chunk.astype(np.float32), rtol=1e-4, M=precond)
+        x, _ = cg(block, v_chunk.astype(np.float32), M=precond, **{_CG_TOL_KEY: 1e-4})
         return x.ravel()
 
     def H_x_matvec(v):
@@ -80,7 +85,7 @@ def joint_embedding(
         return np.concatenate(results)
 
     def H_y_matvec(v):
-        x, _ = cg(S_yy, v.ravel().astype(np.float32), rtol=1e-4, M=precond_y)
+        x, _ = cg(S_yy, v.ravel().astype(np.float32), M=precond_y, **{_CG_TOL_KEY: 1e-4})
         return x.ravel()
 
     def H_matvec(v):
