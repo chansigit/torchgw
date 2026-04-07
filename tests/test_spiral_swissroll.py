@@ -37,13 +37,13 @@ def _sample_swiss_roll(n, seed=1):
 class TestSpiralToSwissRoll:
     """Integration tests on 400 vs 500 spiral -> Swiss roll (default dijkstra mode)."""
 
-    @pytest.fixture(autouse=True)
-    def setup(self):
-        self.spiral, self.a_src = _sample_spiral(400, seed=0)
-        self.swiss_roll, self.a_tgt = _sample_swiss_roll(500, seed=1)
+    @pytest.fixture(autouse=True, scope="class")
+    def setup(self, request):
+        request.cls.spiral, request.cls.a_src = _sample_spiral(400, seed=0)
+        request.cls.swiss_roll, request.cls.a_tgt = _sample_swiss_roll(500, seed=1)
 
-        self.T, self.log_dict = sampled_gw(
-            self.spiral, self.swiss_roll,
+        request.cls.T, request.cls.log_dict = sampled_gw(
+            request.cls.spiral, request.cls.swiss_roll,
             s_shared=400, M=80, alpha=0.8,
             max_iter=300, epsilon=0.005, k=5,
             log=True,

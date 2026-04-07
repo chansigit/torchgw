@@ -133,3 +133,87 @@ def test_landmark_provider_self_distance_zero():
     D_X, _ = provider.get_distances(np.array([5]), np.array([0]), torch.device("cpu"))
 
     assert D_X[5, 0].item() == pytest.approx(0.0, abs=1e-3)
+
+
+# ── Dijkstra cache eviction tests ────────────────────────────────────
+
+def test_dijkstra_cache_eviction():
+    """Cache should evict entries when full and still produce correct results."""
+    rng = np.random.default_rng(42)
+    X = rng.normal(size=(50, 3)).astype(np.float32)
+    g_x = build_knn_graph(X, k=10)
+
+    provider = DijkstraProvider(g_x, g_x)
+    # Set tiny cache to force eviction
+    provider._MAX_CACHE_ROWS = 5
+    device = torch.device("cpu")
+
+    # Fill cache with 5 entries
+    provider.get_distances(np.array([0, 1, 2, 3, 4]), np.array([0]), device)
+    assert len(provider._cache_src) == 5
+
+    # Request new nodes: should evict old ones not in current request
+    D_X, _ = provider.get_distances(np.array([5, 6, 7]), np.array([0]), device)
+    assert D_X.shape == (50, 3)
+    assert torch.all(torch.isfinite(D_X))
+    # Cache should not exceed max
+    assert len(provider._cache_src) <= 5 + 3  # may grow slightly during batch
+
+
+def test_dijkstra_cache_eviction_preserves_needed():
+    """Eviction should not evict nodes that are needed in the current request."""
+    rng = np.random.default_rng(42)
+    X = rng.normal(size=(50, 3)).astype(np.float32)
+    g_x = build_knn_graph(X, k=10)
+
+    provider = DijkstraProvider(g_x, g_x)
+    provider._MAX_CACHE_ROWS = 3
+    device = torch.device("cpu")
+
+    # Fill cache with nodes 0, 1, 2
+    provider.get_distances(np.array([0, 1, 2]), np.array([0]), device)
+
+    # Request nodes 1, 2, 3 — nodes 1 and 2 are cached AND needed,
+    # only node 0 should be evictable
+    D_X, _ = provider.get_distances(np.array([1, 2, 3]), np.array([0]), device)
+    assert D_X.shape == (50, 3)
+    # Node 1 column should match a fresh computation
+    fresh_provider = DijkstraProvider(g_x, g_x)
+    D_fresh, _ = fresh_provider.get_distances(np.array([1]), np.array([0]), device)
+    torch.testing.assert_close(D_X[:, 0], D_fresh[:, 0])
+
+
+def test_dijkstra_cache_repeated_indices():
+    """Requesting the same index multiple times should work correctly."""
+    rng = np.random.default_rng(42)
+    X = rng.normal(size=(30, 3)).astype(np.float32)
+    g_x = build_knn_graph(X, k=10)
+
+    provider = DijkstraProvider(g_x, g_x)
+    device = torch.device("cpu")
+
+    # Same index repeated
+    D_X, _ = provider.get_distances(np.array([5, 5, 5]), np.array([0]), device)
+    assert D_X.shape == (30, 3)
+    # All three columns should be identical (same source node)
+    torch.testing.assert_close(D_X[:, 0], D_X[:, 1])
+    torch.testing.assert_close(D_X[:, 0], D_X[:, 2])
+
+
+# ── PrecomputedProvider device caching ───────────────────────────────
+
+def test_precomputed_provider_device_caching():
+    """Repeated calls with same device should not re-transfer tensors."""
+    rng = np.random.default_rng(42)
+    C_X = torch.from_numpy(rng.random((30, 30)).astype(np.float32))
+    C_Y = torch.from_numpy(rng.random((40, 40)).astype(np.float32))
+
+    provider = PrecomputedProvider(dist_source=C_X, dist_target=C_Y)
+    device = torch.device("cpu")
+
+    D1_X, D1_Y = provider.get_distances(np.array([0, 1]), np.array([0, 1]), device)
+    assert provider._cached_device == device
+    D2_X, D2_Y = provider.get_distances(np.array([2, 3]), np.array([2, 3]), device)
+    # Should still be same device (no re-transfer)
+    assert provider._cached_device == device
+    assert D2_X.shape == (30, 2)

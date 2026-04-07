@@ -88,13 +88,20 @@ def test_precomputed_missing_params():
 
 
 def test_sampled_gw_identity_alignment():
+    """Self-alignment should produce a near-diagonal transport plan.
+
+    GW on identical data can find symmetric (flipped) solutions, so we
+    check that the argmax matching has high Spearman correlation with the
+    identity, not exact diagonal hits.
+    """
+    from scipy.stats import spearmanr
     rng = np.random.default_rng(42)
-    X = rng.normal(size=(30, 5)).astype(np.float32)
-    T = sampled_gw(X, X.copy(), s_shared=30, M=30, max_iter=100, k=5,
-                   alpha=0.5, epsilon=0.01)
+    X = rng.normal(size=(50, 5)).astype(np.float32)
+    T = sampled_gw(X, X.copy(), s_shared=50, M=50, max_iter=200, k=10,
+                   alpha=0.5, epsilon=0.005)
     row_argmax = T.argmax(dim=1).cpu().numpy()
-    diagonal_fraction = np.mean(row_argmax == np.arange(30))
-    assert diagonal_fraction > 0.2, f"Only {diagonal_fraction:.0%} on diagonal"
+    sp, _ = spearmanr(np.arange(50), row_argmax)
+    assert abs(sp) > 0.5, f"|Spearman| = {abs(sp):.4f}, expected > 0.5"
 
 
 def test_sampled_gw_log_returns_tuple(two_datasets):
@@ -315,16 +322,29 @@ def test_mixed_precision_basic(two_datasets):
     assert torch.all(T >= 0)
 
 
-def test_mixed_precision_consistent_with_fp64(two_datasets):
-    """mixed_precision result should be close to fp64 result."""
-    X_src, X_tgt = two_datasets
-    T_fp64 = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
-                        mixed_precision=False)
-    T_mp = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
-                      mixed_precision=True)
-    # Both should have similar total mass and shape
-    assert T_fp64.shape == T_mp.shape
-    assert abs(T_fp64.sum().item() - T_mp.sum().item()) < 0.1
+def test_mixed_precision_sinkhorn_consistent():
+    """Float32 and float64 Sinkhorn on identical cost matrix should agree.
+
+    We test at the Sinkhorn level (not full GW) to isolate precision from
+    sampling noise — full GW runs draw different samples each time.
+    """
+    from torchgw._solver import _sinkhorn_torch
+    N, K = 40, 50
+    torch.manual_seed(42)
+    C = torch.rand(N, K, dtype=torch.float64)
+    a = torch.ones(N, dtype=torch.float64) / N
+    b = torch.ones(K, dtype=torch.float64) / K
+
+    T_fp64 = _sinkhorn_torch(a, b, C, reg=0.05, max_iter=100)
+    T_fp32 = _sinkhorn_torch(a.float(), b.float(), C.float(), reg=0.05, max_iter=100)
+
+    # Argmax agreement should be very high on identical input
+    argmax_64 = T_fp64.argmax(dim=1)
+    argmax_32 = T_fp32.float().argmax(dim=1)  # ensure same dtype for comparison
+    agreement = (argmax_64 == argmax_32).float().mean().item()
+    assert agreement > 0.9, f"Row argmax agreement only {agreement:.0%}"
+    # Total mass should be nearly identical
+    assert abs(T_fp64.sum().item() - T_fp32.double().sum().item()) < 0.01
 
 
 def test_mixed_precision_with_log(two_datasets):
