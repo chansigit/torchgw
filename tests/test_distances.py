@@ -99,6 +99,30 @@ def test_landmark_provider_shapes():
     assert torch.all(D_Y >= 0)
 
 
+def test_dijkstra_provider_cache_hit():
+    """Calling get_distances twice with overlapping indices should use cache."""
+    rng = np.random.default_rng(42)
+    X = rng.normal(size=(50, 3)).astype(np.float32)
+    g_x = build_knn_graph(X, k=10)
+    g_y = build_knn_graph(X.copy(), k=10)
+
+    provider = DijkstraProvider(g_x, g_y)
+    device = torch.device("cpu")
+
+    # First call populates cache
+    idx1 = np.array([0, 5, 10])
+    D_X1, D_Y1 = provider.get_distances(idx1, idx1, device)
+    assert len(provider._cache_src) == 3
+
+    # Second call with overlapping indices should hit cache
+    idx2 = np.array([5, 10, 20])  # 5 and 10 are cached
+    D_X2, D_Y2 = provider.get_distances(idx2, idx2, device)
+    assert len(provider._cache_src) == 4  # only node 20 is new
+
+    # Cached values should be consistent
+    torch.testing.assert_close(D_X1[:, 1], D_X2[:, 0])  # both are node 5
+
+
 def test_landmark_provider_self_distance_zero():
     """Distance from a point to itself should be zero."""
     rng = np.random.default_rng(42)

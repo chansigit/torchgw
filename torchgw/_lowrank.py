@@ -96,8 +96,6 @@ def sinkhorn_lowrank(
     alpha: float = 1e-10,
     dykstra_max_iter: int = 50,
     dykstra_tol: float = 1e-7,
-    semi_relaxed: bool = False,
-    rho: float = 1.0,
 ) -> torch.Tensor:
     """Low-rank Sinkhorn via mirror descent + Dykstra projection.
 
@@ -114,12 +112,10 @@ def sinkhorn_lowrank(
     rank : int, target rank r
     reg : float, entropic regularization (>= 0)
     max_iter : int, outer mirror descent iterations
-    tol : float, not used (kept for interface compat)
+    tol : float, unused (kept for interface compat)
     alpha : float, lower bound for g (must be < 1/rank)
     dykstra_max_iter : int, max iterations for inner Dykstra
     dykstra_tol : float, convergence threshold for Dykstra
-    semi_relaxed : bool (not yet supported for low-rank, ignored)
-    rho : float (ignored)
 
     Returns
     -------

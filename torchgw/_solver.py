@@ -3,7 +3,7 @@ import torch
 
 from torchgw._graph import build_knn_graph
 from torchgw._sampling import sample_pairs_gpu
-from torchgw._utils import get_device, maybe_gc
+from torchgw._utils import get_device
 
 
 # ── Sinkhorn core (shared by both no_grad and differentiable paths) ──────
@@ -692,6 +692,7 @@ def sampled_lowrank_gw(
     multiscale: bool = False,
     n_coarse: int | None = None,
     lambda_ema_beta: float | None = None,
+    mixed_precision: bool = False,
 ) -> torch.Tensor | tuple[torch.Tensor, dict]:
     """Sampled Gromov-Wasserstein with low-rank Sinkhorn.
 
@@ -724,12 +725,17 @@ def sampled_lowrank_gw(
     n_coarse : int, optional
     lambda_ema_beta : float, optional
         EMA smoothing factor for the cost matrix (see ``sampled_gw``).
+    mixed_precision : bool
+        Run internal computations in float32 for speed (see ``sampled_gw``).
 
     Returns
     -------
     T : Tensor (ns, nt)
     log_dict : dict (only if log=True)
     """
+    if semi_relaxed:
+        raise ValueError("semi_relaxed is not supported for low-rank Sinkhorn")
+
     from torchgw._lowrank import sinkhorn_lowrank
 
     (X_source, X_target, p, q, dist_source, dist_target, C_linear_t,
@@ -774,11 +780,7 @@ def sampled_lowrank_gw(
         return sinkhorn_lowrank(
             a, b, C, rank=rank, reg=reg,
             max_iter=lr_max_iter, dykstra_max_iter=lr_dykstra_max_iter,
-            semi_relaxed=semi_relaxed, rho=rho,
         )
-
-    if semi_relaxed:
-        raise ValueError("semi_relaxed is not supported for low-rank Sinkhorn")
 
     with torch.no_grad():
         T_out, err_list, n_iter, gw_cost_val = _gw_loop(
@@ -792,6 +794,7 @@ def sampled_lowrank_gw(
             device=device, verbose=verbose, verbose_every=verbose_every,
             semi_relaxed=False, rho=rho,
             lambda_ema_beta=lambda_ema_beta,
+            mixed_precision=mixed_precision,
         )
 
     if log:

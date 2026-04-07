@@ -299,3 +299,61 @@ def test_semi_relaxed(two_datasets):
     row_sums = T.sum(dim=1)
     assert torch.allclose(row_sums, p, atol=0.01), \
         f"Source marginal error: {(row_sums - p).abs().max():.4e}"
+
+
+# ── mixed_precision tests ──────────────────────────────────────────────
+
+
+def test_mixed_precision_basic(two_datasets):
+    """mixed_precision=True should produce a valid plan with float64 output."""
+    X_src, X_tgt = two_datasets
+    T = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
+                   mixed_precision=True)
+    assert isinstance(T, torch.Tensor)
+    assert T.dtype == torch.float64
+    assert T.shape == (150, 150)
+    assert torch.all(T >= 0)
+
+
+def test_mixed_precision_consistent_with_fp64(two_datasets):
+    """mixed_precision result should be close to fp64 result."""
+    X_src, X_tgt = two_datasets
+    T_fp64 = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
+                        mixed_precision=False)
+    T_mp = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
+                      mixed_precision=True)
+    # Both should have similar total mass and shape
+    assert T_fp64.shape == T_mp.shape
+    assert abs(T_fp64.sum().item() - T_mp.sum().item()) < 0.1
+
+
+def test_mixed_precision_with_log(two_datasets):
+    """mixed_precision should work with log=True."""
+    X_src, X_tgt = two_datasets
+    result = sampled_gw(X_src, X_tgt, s_shared=50, M=30, max_iter=10,
+                        mixed_precision=True, log=True)
+    T, log_dict = result
+    assert T.dtype == torch.float64
+    assert np.isfinite(log_dict["gw_cost"])
+
+
+def test_lowrank_mixed_precision(two_datasets):
+    """mixed_precision should work with low-rank solver."""
+    from torchgw import sampled_lowrank_gw
+    X_src, X_tgt = two_datasets
+    T = sampled_lowrank_gw(X_src, X_tgt, rank=10, s_shared=50, M=30,
+                           max_iter=10, mixed_precision=True)
+    assert T.dtype == torch.float64
+    assert T.shape == (150, 150)
+    assert torch.all(T >= 0)
+
+
+def test_lowrank_semi_relaxed_early_error():
+    """semi_relaxed should raise immediately, before any computation."""
+    from torchgw import sampled_lowrank_gw
+    with pytest.raises(ValueError, match="semi_relaxed"):
+        sampled_lowrank_gw(
+            np.random.randn(10, 3).astype(np.float32),
+            np.random.randn(10, 3).astype(np.float32),
+            semi_relaxed=True, M=5, max_iter=5,
+        )

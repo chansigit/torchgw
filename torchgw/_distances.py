@@ -52,7 +52,6 @@ class DijkstraProvider:
     ) -> np.ndarray:
         """Get Dijkstra rows for indices, using cache for hits."""
         unique = np.unique(indices)
-        # Split into cached vs uncached
         uncached = np.array([s for s in unique if s not in cache], dtype=np.intp)
 
         if len(uncached) > 0:
@@ -60,8 +59,12 @@ class DijkstraProvider:
             for i, s in enumerate(uncached):
                 cache[s] = D_new[i].astype(np.float32)
 
-        # Assemble result for all requested indices (with duplicates)
-        return np.vstack([cache[int(s)] for s in indices])
+        # Pre-allocate and fill (avoids list of arrays + vstack)
+        N = graph.shape[0]
+        result = np.empty((len(indices), N), dtype=np.float32)
+        for i, s in enumerate(indices):
+            result[i] = cache[int(s)]
+        return result
 
     def get_distances(
         self,

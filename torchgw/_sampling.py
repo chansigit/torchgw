@@ -72,9 +72,8 @@ def sample_pairs_gpu(
     p_rows = T.sum(dim=1)
     total = p_rows.sum()
     if total < 1e-9:
-        rows = torch.randint(0, N, (M,), device=T.device)
-        cols = torch.randint(0, K, (M,), device=T.device)
-        return rows.cpu().numpy(), cols.cpu().numpy()
+        rng = np.random.default_rng()
+        return rng.integers(0, N, size=M), rng.integers(0, K, size=M)
 
     p_rows = p_rows / total
     rows = torch.multinomial(p_rows, M, replacement=True)
