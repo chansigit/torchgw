@@ -412,8 +412,7 @@ def _gw_loop(
         # Sinkhorn step
         if use_augmented:
             Lambda_aug[:N, :K] = Lambda if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype)
-            max_val = Lambda.max().item()
-            penalty = 100.0 * max_val if max_val > 0 else 100.0
+            penalty = 100.0 * Lambda.max().clamp(min=1.0)  # stays on GPU, no sync
             Lambda_aug[:-1, -1] = penalty
             Lambda_aug[-1, :-1] = penalty
             Lambda_aug[-1, -1] = 0.0
@@ -435,35 +434,40 @@ def _gw_loop(
         # Momentum update
         T_real = (1 - alpha) * T_prev + alpha * T_new
 
-        # GW cost (unregularized) — dot product avoids N×K intermediate
-        Lambda_flat = Lambda.reshape(-1) if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype).reshape(-1)
-        gw_cost_val = torch.dot(Lambda_flat, T_real.reshape(-1)).item()
-
-        err = torch.linalg.norm(T_real - T_prev).item()
-        err_list.append(err)
         n_iter = i + 1
-        if verbose and (n_iter % verbose_every == 0 or i == max_iter - 1):
-            print(f"  iter {n_iter:>4}/{max_iter} | err: {err:.4e} | "
-                  f"gw_cost: {gw_cost_val:.4e} | reg: {current_reg:.4e}")
+        _check_interval = 5  # sync with CPU every N iterations
 
-        # Convergence: plan change OR cost EMA plateau
-        _cost_ema = gw_cost_val if _cost_ema is None else 0.8 * _cost_ema + 0.2 * gw_cost_val
-        if i >= min_iter_before_converge:
-            if err < tol:
-                if verbose:
-                    print(f"  converged at iteration {n_iter} (err={err:.4e})")
-                break
-            # Cost plateau: EMA stopped improving by >0.5% for _patience iters
-            if _cost_ema < _best_cost_ema * 0.995:
-                _best_cost_ema = _cost_ema
-                _no_improve = 0
-            else:
-                _no_improve += 1
-            if _no_improve >= _patience:
-                if verbose:
-                    print(f"  cost plateau at iteration {n_iter} "
-                          f"(no improve for {_patience} iters, gw_cost={gw_cost_val:.4e})")
-                break
+        # Compute metrics on GPU (no .item() sync) every iteration
+        err_tensor = torch.linalg.norm(T_real - T_prev)
+
+        # Only sync to CPU at check intervals (reduces CUDA sync overhead)
+        if n_iter % _check_interval == 0 or i == max_iter - 1 or i >= min_iter_before_converge:
+            Lambda_flat = Lambda.reshape(-1) if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype).reshape(-1)
+            gw_cost_val = torch.dot(Lambda_flat, T_real.reshape(-1)).item()
+            err = err_tensor.item()
+            err_list.append(err)
+
+            if verbose and (n_iter % verbose_every == 0 or i == max_iter - 1):
+                print(f"  iter {n_iter:>4}/{max_iter} | err: {err:.4e} | "
+                      f"gw_cost: {gw_cost_val:.4e} | reg: {current_reg:.4e}")
+
+            # Convergence: plan change OR cost EMA plateau
+            _cost_ema = gw_cost_val if _cost_ema is None else 0.8 * _cost_ema + 0.2 * gw_cost_val
+            if i >= min_iter_before_converge:
+                if err < tol:
+                    if verbose:
+                        print(f"  converged at iteration {n_iter} (err={err:.4e})")
+                    break
+                if _cost_ema < _best_cost_ema * 0.995:
+                    _best_cost_ema = _cost_ema
+                    _no_improve = 0
+                else:
+                    _no_improve += 1
+                if _no_improve >= _patience:
+                    if verbose:
+                        print(f"  cost plateau at iteration {n_iter} "
+                              f"(no improve for {_patience} iters, gw_cost={gw_cost_val:.4e})")
+                    break
 
         del T_new
         if use_augmented:
