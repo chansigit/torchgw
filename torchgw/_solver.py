@@ -1,5 +1,3 @@
-from functools import partial
-
 import numpy as np
 import torch
 
@@ -121,31 +119,19 @@ def _sinkhorn_torch(
     semi_relaxed: bool = False,
     rho: float = 1.0,
     verbose: bool = False,
-    mixed_precision: bool = False,
 ) -> torch.Tensor:
     """Log-domain Sinkhorn for numerical stability. Pure PyTorch.
 
-    When mixed_precision=True, all log-domain iterations run in float32
-    (safe because values are O(log N) magnitude), then the result is
-    cast back to the input dtype. This can give 2-8x speedup on GPU.
+    Operates in whatever dtype the inputs are given (float32 or float64).
+    Dtype selection is handled by the caller (_gw_loop via sink_dtype).
     """
-    out_dtype = C.dtype
-    if mixed_precision and out_dtype != torch.float32:
-        C = C.float()
-        a = a.float()
-        b = b.float()
-
     log_K = -C / reg
     log_a = torch.log(a.clamp(min=1e-30))
     log_b = torch.log(b.clamp(min=1e-30))
     tau = rho / (rho + reg) if semi_relaxed else 1.0
 
     log_u, log_v = _sinkhorn_loop(log_K, log_a, log_b, tau, max_iter, tol, check_every, a, verbose=verbose)
-    T = torch.exp(log_u.unsqueeze(1) + log_K + log_v.unsqueeze(0))
-
-    if mixed_precision and out_dtype != torch.float32:
-        T = T.to(out_dtype)
-    return T
+    return torch.exp(log_u.unsqueeze(1) + log_K + log_v.unsqueeze(0))
 
 
 class _SinkhornAutograd(torch.autograd.Function):
@@ -314,6 +300,7 @@ def _gw_loop(
     rho: float,
     differentiable: bool = False,
     lambda_ema_beta: float | None = None,
+    mixed_precision: bool = False,
 ) -> tuple[torch.Tensor, list, int, float]:
     """Shared main loop for sampled_gw and sampled_lowrank_gw.
 
@@ -335,7 +322,10 @@ def _gw_loop(
     if M < 1:
         raise ValueError(f"M must be >= 1, got {M}")
 
-    T_real = T_init
+    # Sinkhorn internal dtype: float32 when mixed_precision, else float64
+    sink_dtype = torch.float32 if mixed_precision else torch.float64
+
+    T_real = T_init.to(sink_dtype)
 
     # Augmented marginals (only needed for standard Sinkhorn)
     if use_augmented:
@@ -357,7 +347,7 @@ def _gw_loop(
 
     # Pre-allocate augmented cost matrix (reused every iteration)
     if use_augmented:
-        Lambda_aug = torch.zeros(N + 1, K + 1, device=device, dtype=torch.float64)
+        Lambda_aug = torch.zeros(N + 1, K + 1, device=device, dtype=sink_dtype)
 
     for i in range(max_iter):
         current_reg = initial_reg * (decay ** i)
@@ -408,7 +398,7 @@ def _gw_loop(
 
         # Sinkhorn step
         if use_augmented:
-            Lambda_aug[:N, :K] = Lambda.to(torch.float64)
+            Lambda_aug[:N, :K] = Lambda.to(sink_dtype)
             max_val = Lambda.max().item()
             penalty = 100.0 * max_val if max_val > 0 else 100.0
             Lambda_aug[:-1, -1] = penalty
@@ -416,21 +406,25 @@ def _gw_loop(
             Lambda_aug[-1, -1] = 0.0
 
             verbose_sink = verbose and (n_iter + 1) % verbose_every == 0
-            T_aug = sinkhorn_fn(p_aug, q_aug, Lambda_aug, current_reg,
+            T_aug = sinkhorn_fn(p_aug.to(sink_dtype), q_aug.to(sink_dtype),
+                                Lambda_aug, current_reg,
                                 semi_relaxed=semi_relaxed, rho=rho,
                                 verbose=verbose_sink)
             T_new = T_aug[:-1, :-1]
         else:
             verbose_sink = verbose and (n_iter + 1) % verbose_every == 0
-            T_new = sinkhorn_fn(p_real, q_real, Lambda.to(torch.float64),
+            T_new = sinkhorn_fn(p_real.to(sink_dtype), q_real.to(sink_dtype),
+                                Lambda.to(sink_dtype),
                                 current_reg, semi_relaxed=semi_relaxed, rho=rho,
                                 verbose=verbose_sink)
 
         # Momentum update
         T_real = (1 - alpha) * T_prev + alpha * T_new
 
-        # GW cost (unregularized)
-        gw_cost_val = (Lambda.to(torch.float64) * T_real).sum().item()
+        # GW cost (unregularized) — dot product avoids N×K intermediate
+        gw_cost_val = torch.dot(
+            Lambda.to(sink_dtype).reshape(-1), T_real.reshape(-1)
+        ).item()
 
         err = torch.linalg.norm(T_real - T_prev).item()
         err_list.append(err)
@@ -452,9 +446,11 @@ def _gw_loop(
         if n_iter % 50 == 0:
             maybe_gc(do_cuda=True)
 
+    # Cast back to float64 for output precision
+    T_out = T_real if T_real.dtype == torch.float64 else T_real.to(torch.float64)
     if differentiable:
-        return T_real, err_list, n_iter, gw_cost_val
-    return T_real.detach(), err_list, n_iter, gw_cost_val
+        return T_out, err_list, n_iter, gw_cost_val
+    return T_out.detach(), err_list, n_iter, gw_cost_val
 
 
 # ── Multiscale helper ────────────────────────────────────────────────────
@@ -637,10 +633,7 @@ def sampled_gw(
 
     # Sinkhorn function
     ctx = torch.no_grad() if not differentiable else torch.enable_grad()
-    if differentiable:
-        sinkhorn_fn = _sinkhorn_differentiable
-    else:
-        sinkhorn_fn = partial(_sinkhorn_torch, mixed_precision=mixed_precision)
+    sinkhorn_fn = _sinkhorn_differentiable if differentiable else _sinkhorn_torch
 
     with ctx:
         T_out, err_list, n_iter, gw_cost_val = _gw_loop(
@@ -655,6 +648,7 @@ def sampled_gw(
             semi_relaxed=semi_relaxed, rho=rho,
             differentiable=differentiable,
             lambda_ema_beta=lambda_ema_beta,
+            mixed_precision=mixed_precision,
         )
 
     if log:
