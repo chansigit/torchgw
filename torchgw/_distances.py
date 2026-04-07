@@ -86,6 +86,7 @@ class PrecomputedProvider:
                 "PrecomputedProvider requires either (dist_source, dist_target) "
                 "or (graph_source, graph_target)"
             )
+        self._cached_device: torch.device | None = None
 
     def get_distances(
         self,
@@ -93,8 +94,12 @@ class PrecomputedProvider:
         tgt_indices: np.ndarray,
         device: torch.device,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        D_X = self.C_X[:, src_indices].to(device)
-        D_Y = self.C_Y[:, tgt_indices].to(device)
+        if self._cached_device != device:
+            self.C_X = self.C_X.to(device)
+            self.C_Y = self.C_Y.to(device)
+            self._cached_device = device
+        D_X = self.C_X[:, src_indices]
+        D_Y = self.C_Y[:, tgt_indices]
         return D_X, D_Y
 
 
