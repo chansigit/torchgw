@@ -25,6 +25,34 @@ mirror descent + Dykstra overhead. Possible directions:
   avoiding full T reconstruction
 - GPU-optimized Dykstra projection kernels
 
+### torch.compile integration
+
+`_sinkhorn_iterations` is designed to be compilable via `torch.compile(mode="reduce-overhead")`,
+which fuses the logsumexp + broadcast operations into fewer GPU kernels. The code includes
+a lazy-init compiled path (`_get_compiled_sinkhorn`), but some environments lack the required
+`torch._thread_safe_fork` module (observed with PyTorch 2.6 on shared clusters). When compile
+is unavailable, the fallback Python loop is used automatically.
+
+Priority: high impact (Sinkhorn is ~73% of loop time). When working, expect 2-4x speedup on
+the Sinkhorn portion. Fix: ensure a complete PyTorch installation with Inductor support.
+
+### Triton fused Sinkhorn kernel
+
+A custom Triton kernel for the Sinkhorn row/column updates can achieve the same fusion as
+`torch.compile` without depending on the Inductor compiler. The kernel would perform single-pass
+online logsumexp (no intermediate N×K matrix), reducing both memory and kernel launch overhead.
+This is the recommended path if `torch.compile` remains unavailable.
+
+### GPU-native shortest paths (cuGraph)
+
+`DijkstraProvider` runs scipy Dijkstra on CPU. For `distance_mode="dijkstra"`, this is the
+main per-iteration cost. `nvidia/cugraph` provides GPU-native SSSP but is hard to install
+(requires RAPIDS conda environment). Implementation plan:
+
+- Add optional `backend="scipy"` / `"cugraph"` parameter to distance providers
+- Lazy-import cugraph at runtime; fall back to scipy if unavailable
+- Do NOT add cugraph as a hard dependency
+
 ### Scalability beyond 100k
 
 At N, K > 100k the full N x K cost matrix Lambda becomes the memory bottleneck
