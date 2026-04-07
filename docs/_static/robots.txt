@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chansigit.github.io/torchgw/sitemap.xml
