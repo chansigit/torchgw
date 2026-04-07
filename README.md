@@ -6,6 +6,7 @@
 
 [![Docs](https://img.shields.io/badge/docs-chansigit.github.io%2Ftorchgw-blue)](https://chansigit.github.io/torchgw/)
 [![GitHub](https://img.shields.io/badge/github-chansigit%2Ftorchgw-black?logo=github)](https://github.com/chansigit/torchgw)
+[![Version](https://img.shields.io/badge/version-0.4.0-green)](CHANGELOG.md)
 
 A **pure PyTorch** solver for [Gromov-Wasserstein](https://arxiv.org/abs/1805.09114) optimal transport.
 Aligns two point clouds by matching their internal distance structures — even when the point clouds
@@ -15,6 +16,22 @@ live in different dimensions.
 and approximates the cost in *O(NKM)*, enabling GPU-accelerated alignment at scales where
 standard solvers are impractical.
 
+---
+
+## News
+
+**v0.4.0** (2026-04-07) — Performance & robustness release
+
+- **Triton fused Sinkhorn kernels** — 2-5x speedup on GPU via single-pass online logsumexp, no N×K intermediate matrices
+- **Mixed precision** — `mixed_precision=True` runs Sinkhorn in float32, output stays float64
+- **Smart early stopping** — cost plateau detection stops when the solver has converged, not when it hits `max_iter`
+- **Sinkhorn warm-start** — reuses potentials across GW iterations, halving Sinkhorn steps
+- **Dijkstra caching** — avoids redundant shortest-path computations across iterations
+- **15 numerical stability & correctness fixes** — log-domain safety, kNN symmetrization, semi-relaxed damping, and more
+- See [CHANGELOG.md](CHANGELOG.md) for the full list
+
+---
+
 ## Installation
 
 ```bash
@@ -22,6 +39,7 @@ pip install -e .
 ```
 
 Requires `numpy`, `scipy`, `scikit-learn`, `torch`, `joblib`. No POT at runtime.
+Triton (ships with PyTorch 2.0+) enables GPU kernel fusion automatically.
 
 ## Quick start
 
@@ -36,33 +54,41 @@ T = sampled_gw(X, Y, epsilon=0.005, M=80, max_iter=200)
 # T[i,j] = coupling weight between X[i] and Y[j]
 ```
 
+For best GPU performance on large problems:
+
+```python
+T = sampled_gw(X, Y, distance_mode="landmark", mixed_precision=True)
+```
+
 ## How it works
 
 Each iteration:
 
-1. **Sample** *M* anchor pairs from the current transport plan *T*
+1. **Sample** *M* anchor pairs from the current transport plan *T* (GPU multinomial)
 2. **Compute distances** from all points to the sampled anchors (Dijkstra / precomputed / landmark)
 3. **Assemble GW cost matrix** from the sampled distances
-4. **Sinkhorn projection** to obtain a new transport plan (log-domain, float64)
-5. **Momentum update** to smooth convergence
+4. **Sinkhorn projection** to obtain a new transport plan (Triton fused log-domain kernels)
+5. **Momentum update** with warm-started potentials
 
 Key design choices:
-- Log-domain Sinkhorn on GPU — no CPU-GPU transfer, no POT dependency
-- Marginals in float64 (stability), cost matrix in float32 (speed)
-- Entropic regularization with exponential decay schedule
+- Triton fused Sinkhorn on GPU — single-pass online logsumexp, no intermediate N×K matrices
+- Automatic fallback to pure PyTorch when Triton is unavailable (CPU, older PyTorch)
+- Mixed precision: float32 Sinkhorn + float64 marginals/output for speed without quality loss
+- Smart convergence: cost plateau detection + transport plan norm check
 
 ## Benchmark
 
-Spiral (2D) to Swiss roll (3D), compared with [POT](https://pythonot.github.io/):
+Spiral (2D) to Swiss roll (3D), NVIDIA L40S:
 
-| Scale | Method | Time | GW distance | Spearman |
-|-------|--------|:----:|:-----------:|:--------:|
-| 400 vs 500 | POT | 1.6s | 3.57e-3 | 0.999 |
-| 400 vs 500 | **TorchGW** | **0.9s** | **1.39e-3** | 0.998 |
-| 4000 vs 5000 | POT | 183s | 3.21e-3 | 0.999 |
-| 4000 vs 5000 | **TorchGW** | **2.4s** | **1.17e-3** | **0.999** |
+| Scale | Method | Time | Spearman |
+|-------|--------|:----:|:--------:|
+| 400 vs 500 | POT | 1.6s | 0.999 |
+| 400 vs 500 | **TorchGW** | **0.46s** | **0.999** |
+| 4000 vs 5000 | POT | 183s | 0.999 |
+| 4000 vs 5000 | **TorchGW** (precomputed) | **5.07s** | **0.998** |
+| 4000 vs 5000 | **TorchGW** (landmark) | **1.04s** | **0.999** |
 
-At 4000x5000, **TorchGW is ~75x faster** with equal or better accuracy.
+At 4000×5000 with landmark distances, **TorchGW is ~175x faster** than POT.
 
 <details>
 <summary>Benchmark plots (click to expand)</summary>
@@ -74,6 +100,16 @@ At 4000x5000, **TorchGW is ~75x faster** with equal or better accuracy.
 ![4000 vs 5000](docs/demo_spiral_to_swissroll_4000v5000.png)
 
 </details>
+
+**Distance mode scaling guide** — choose based on your data size:
+
+| Mode | Best for | Per-iteration cost | Memory |
+|------|:--------:|:------------------:|:------:|
+| `"precomputed"` | N < 5k | O(NM) lookup | O(N²) |
+| `"dijkstra"` (default) | 5k–50k | O(MN log N) | O(NM) |
+| `"landmark"` | **N > 5k recommended** | O(NMd) GPU | O(Nd) |
+
+> For most use cases, `distance_mode="landmark"` gives the best speed/quality tradeoff.
 
 ---
 
@@ -104,6 +140,7 @@ sampled_gw(
     multiscale=False,         # coarse-to-fine warm start
     n_coarse=None,            # coarse size (auto if None)
     lambda_ema_beta=None,     # EMA smoothing for cost matrix (0–1)
+    mixed_precision=False,    # float32 Sinkhorn for speed
     device=None, verbose=False, log=False,
 ) -> Tensor                   # (N, K) transport plan
 ```
@@ -132,26 +169,28 @@ sampled_lowrank_gw(
 
 ### Distance strategies
 
-Choose based on your data scale:
-
-| Mode | Scale | Per-iteration | Memory |
-|------|:-----:|:-------------:|:------:|
-| `"precomputed"` | N < 5k | O(NM) lookup | O(N^2) |
-| `"dijkstra"` (default) | 5k-50k | O(MN log N) | O(NM) |
-| `"landmark"` | N > 50k | O(NMd) GPU | O(Nd) |
-
 ```python
-# Small scale: precompute all-pairs distances once
+# Small scale (N < 5k): precompute all-pairs distances once
 T = sampled_gw(X, Y, distance_mode="precomputed")
 
 # Or pass your own distance matrices (skips graph construction)
 T = sampled_gw(dist_source=D_X, dist_target=D_Y, distance_mode="precomputed")
 
-# Large scale: landmark Dijkstra (FPS + GPU cdist)
+# Large scale (recommended): landmark Dijkstra (FPS + GPU cdist)
 T = sampled_gw(X, Y, distance_mode="landmark", n_landmarks=50)
 ```
 
-See [examples/benchmark_distance_modes.md](examples/benchmark_distance_modes.md) for detailed comparison.
+### Best performance settings
+
+```python
+T = sampled_gw(
+    X, Y,
+    distance_mode="landmark",   # avoids expensive all-pairs Dijkstra
+    mixed_precision=True,       # float32 Sinkhorn (2x faster on GPU)
+    M=80,                       # more samples = better cost estimate
+    epsilon=0.005,              # moderate regularization
+)
+```
 
 ### Fused Gromov-Wasserstein
 
