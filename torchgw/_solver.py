@@ -272,7 +272,10 @@ def _gw_loop(
 
     for i in range(max_iter):
         current_reg = initial_reg * (decay ** i)
-        T_prev = T_real.clone()
+        # In differentiable mode, detach T_prev to prevent computation graph
+        # accumulation across iterations; only the final iteration's Sinkhorn
+        # step will carry gradients through the momentum blend.
+        T_prev = T_real.detach().clone() if differentiable else T_real.clone()
 
         # Sample anchor pairs
         T_cpu = T_real.detach().cpu().numpy()
