@@ -260,9 +260,9 @@ def _gw_loop(
         p_aug = torch.cat([p_real, torch.tensor([slack_p], device=device, dtype=torch.float64)])
         q_aug = torch.cat([q_real, torch.tensor([slack_q], device=device, dtype=torch.float64)])
 
-    # Regularization decay
+    # Regularization decay (at most 10x reduction to avoid instability)
     initial_reg = epsilon if epsilon > 0 else 1e-4
-    final_reg = min(5e-4, initial_reg)
+    final_reg = max(initial_reg / 10.0, min(5e-4, initial_reg))
     decay = (final_reg / initial_reg) ** (1 / max(1, max_iter))
 
     err_list = []
