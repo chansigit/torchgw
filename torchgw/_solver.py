@@ -192,53 +192,49 @@ def _adjoint_sinkhorn_vjp(
     b: torch.Tensor,
     reg: float,
     grad_T: torch.Tensor,
-    max_iter: int = 100,
-    tol: float = 1e-8,
 ) -> torch.Tensor:
     """Compute dL/dC via implicit differentiation at the Sinkhorn fixed point.
 
-    At convergence the Sinkhorn potentials satisfy:
-        F_1 = log u - log a + logsumexp(-C/ε + log v, dim=1) = 0
-        F_2 = log v - log b + logsumexp(-C/ε + log u, dim=0) = 0
+    The adjoint system (from IFT on Sinkhorn fixed-point conditions) is:
 
-    The adjoint system (derived from the implicit function theorem) is:
-        [[I, P], [Q^T, I]] · [λ_u, λ_v] = [r_u, r_v]
+        J^T · [λ_u, λ_v] = [r_u, r_v]
 
-    where P_{ij} = T_{ij}/a_i, Q_{ij} = T_{ij}/b_j,
-          r_u = (G ⊙ T)·1, r_v = (G ⊙ T)^T·1, G = grad_T.
+    where J = [[I, P], [R, I]], P_{ij} = T_{ij}/a_i, R_{ji} = T_{ij}/b_j,
+    r_u = (G ⊙ T)·1, r_v = (G ⊙ T)^T·1, G = grad_T.
 
-    Solved by fixed-point iteration:
-        λ_u ← r_u - P · λ_v
-        λ_v ← r_v - Q^T · λ_u
+    Solved via Schur complement on J^T (well-conditioned, eigenvalues in
+    [0, 2]).  The system has a rank-1 null space from the Sinkhorn potential
+    constant ambiguity, removed by a rank-1 correction (11^T/K) that
+    preserves the gradient-relevant components.
 
-    Final VJP: dL/dC_{kl} = (T_{kl}/ε) · (λ_u_k/a_k + λ_v_l/b_l)
+    Final VJP: dL/dC_{kl} = (T_{kl}/ε) · (-G_{kl} + λ_u_k/a_k + λ_v_l/b_l)
     """
+    N, K = T.shape
     G_T = grad_T * T  # G ⊙ T, shape (N, K)
     r_u = G_T.sum(dim=1)  # (N,)
     r_v = G_T.sum(dim=0)  # (K,)
 
-    # Adjoint system:  [[diag(a), T], [T^T, diag(b)]] [λ_u, λ_v] = [r_u, r_v]
-    # Fixed-point iteration:
-    #   λ_u ← (r_u - T @ λ_v) / a
-    #   λ_v ← (r_v - T^T @ λ_u) / b
+    # Jacobian blocks (row-stochastic matrices)
+    P = T / a.unsqueeze(1)   # (N, K), P_{ij} = T_{ij}/a_i
+    R_T = T / b.unsqueeze(0) # (N, K), R^T_{ij} = T_{ij}/b_j
 
-    lambda_u = r_u / a
-    lambda_v = r_v / b
+    # Schur complement on J^T: eliminate λ_u = r_u - R^T λ_v
+    # → (I_K - P^T R^T) λ_v = r_v - P^T r_u
+    S = torch.eye(K, dtype=T.dtype, device=T.device) - P.T @ R_T  # (K, K)
 
-    for _ in range(max_iter):
-        lambda_u_new = (r_u - T @ lambda_v) / a        # (N,)
-        lambda_v_new = (r_v - T.T @ lambda_u_new) / b   # (K,)
+    # S has a rank-1 null space (eigvec ∝ 1_K) from the potential constant
+    # ambiguity.  Adding 11^T/K replaces the zero eigenvalue with 1, making
+    # S nonsingular.  Since the RHS is orthogonal to 1_K (sum(r_u) = sum(r_v)
+    # for any valid upstream gradient), this doesn't affect the solution.
+    S += torch.ones(K, K, dtype=T.dtype, device=T.device) / K
 
-        delta_u = (lambda_u_new - lambda_u).abs().max()
-        delta_v = (lambda_v_new - lambda_v).abs().max()
-        lambda_u = lambda_u_new
-        lambda_v = lambda_v_new
+    rhs_v = r_v - P.T @ r_u                # (K,)
+    lambda_v = torch.linalg.solve(S, rhs_v) # (K,)
+    lambda_u = r_u - R_T @ lambda_v          # (N,)
 
-        if max(delta_u.item(), delta_v.item()) < tol:
-            break
-
-    # VJP: dL/dC_{kl} = (T_{kl}/reg) * (-W_{kl} + λ_u_k + λ_v_l)
-    grad_C = (T / reg) * (-grad_T + lambda_u.unsqueeze(1) + lambda_v.unsqueeze(0))
+    grad_C = (T / reg) * (-grad_T
+                           + (lambda_u / a).unsqueeze(1)
+                           + (lambda_v / b).unsqueeze(0))
     return grad_C
 
 
