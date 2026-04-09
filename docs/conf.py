@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.abspath(".."))
 
 project = "TorchGW"
-copyright = "2026, Sijie Chen"
+copyright = "2026, The Board of Trustees of the Leland Stanford Junior University"
 author = "Sijie Chen"
 release = "0.4.0"
 

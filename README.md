@@ -328,6 +328,8 @@ It is free for academic and other non-commercial research and educational use un
 
 Any commercial use — including any use by or on behalf of a for-profit entity, internal commercial research, product development, consulting, paid services, or deployment in commercial settings — requires a separate paid commercial license.
 
-For commercial licensing inquiries, please contact: chansigit@gmail.com
+Copyright (c) 2026 The Board of Trustees of the Leland Stanford Junior University.
+
+For commercial licensing inquiries, contact Stanford Office of Technology Licensing: otl@stanford.edu
 
 See [`COMMERCIAL_LICENSE.md`](COMMERCIAL_LICENSE.md) for details.

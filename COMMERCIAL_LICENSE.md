@@ -24,5 +24,5 @@ A commercial license may include, depending on agreement:
 
 For commercial licensing inquiries, please contact:
 
-Sijie Chen
-chansigit@gmail.com
+Stanford University Office of Technology Licensing
+otl@stanford.edu

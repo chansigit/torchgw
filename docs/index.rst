@@ -129,4 +129,7 @@ License
 Free for academic and non-commercial use. Commercial use requires a separate license.
 See `LICENSE <https://github.com/chansigit/torchgw/blob/main/LICENSE>`_ and
 `COMMERCIAL_LICENSE.md <https://github.com/chansigit/torchgw/blob/main/COMMERCIAL_LICENSE.md>`_
-for details. Contact: chansigit@gmail.com
+for details.
+
+Copyright (c) 2026 The Board of Trustees of the Leland Stanford Junior University.
+For commercial licensing inquiries, contact Stanford OTL: otl@stanford.edu
