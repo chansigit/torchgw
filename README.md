@@ -325,40 +325,37 @@ magnitude cheaper.
 
 ### Algorithm
 
-```
-  Source X (N points, D dims)          Target Y (K points, D' dims)
-         │                                      │
-         │    build kNN graph + Dijkstra /       │
-         │    landmark distances                 │
-         ▼                                       ▼
-  ┌──────────────────────────────────────────────────┐
-  │                   GW Main Loop                   │
-  │                                                  │
-  │  1. Sample M anchor pairs (i,j) from current T  │
-  │     (GPU multinomial, weighted by coupling mass) │
-  │                                                  │
-  │  2. Compute graph distances from anchors         │
-  │     D_left (N × M), D_tgt (K × M)               │
-  │                                                  │
-  │  3. Assemble N × K GW cost matrix:               │
-  │     Λ = mean(D²_left) - 2/M · D_left·D_tgt' +  │
-  │         mean(D²_tgt)                             │
-  │                                                  │
-  │  4. Sinkhorn projection: solve regularized OT    │
-  │     on Λ to get T_new (Triton fused kernels,     │
-  │     log-domain for numerical stability)          │
-  │                                                  │
-  │  5. Momentum blend: T ← (1-α)T + α·T_new       │
-  │     (warm-start Sinkhorn potentials for next     │
-  │     iteration)                                   │
-  │                                                  │
-  │  6. Check convergence: cost plateau detection    │
-  │                                                  │
-  │  ↺ repeat until converged                        │
-  └──────────────────────┬───────────────────────────┘
-                         ▼
-                   T* (N × K)
-            optimal transport plan
+```mermaid
+flowchart TB
+    subgraph inputs [" "]
+        direction LR
+        X["Source X\n(N points, D dims)"]
+        Y["Target Y\n(K points, D' dims)"]
+    end
+
+    X --> G1["Build kNN graph"]
+    Y --> G2["Build kNN graph"]
+
+    G1 --> loop
+    G2 --> loop
+
+    subgraph loop ["GW Main Loop — repeat until converged"]
+        S["1. Sample M anchor pairs (i,j)\nfrom current T\n(GPU multinomial)"]
+        D["2. Compute graph distances\nfrom anchors\nD_left (N×M), D_tgt (K×M)"]
+        C["3. Assemble GW cost matrix (N×K)\nΛ = mean(D²_left) − 2/M · D_left·D_tgt' + mean(D²_tgt)"]
+        K["4. Sinkhorn projection → T_new\n(Triton fused kernels, log-domain)"]
+        M["5. Momentum blend\nT ← (1−α)T + α·T_new\n+ warm-start potentials"]
+        CV["6. Converged?\n(cost plateau detection)"]
+
+        S --> D --> C --> K --> M --> CV
+        CV -- "no" --> S
+    end
+
+    CV -- "yes" --> T["T* (N × K)\noptimal transport plan"]
+
+    style inputs fill:none,stroke:none
+    style loop fill:#f8f9fa,stroke:#dee2e6,stroke-width:2px
+    style T fill:#d4edda,stroke:#28a745,stroke-width:2px
 ```
 
 ### Why it's fast
