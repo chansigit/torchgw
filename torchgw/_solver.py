@@ -660,8 +660,12 @@ def _gw_loop(
 
         # Only sync to CPU at check intervals (reduces CUDA sync overhead)
         if n_iter % _check_interval == 0 or i == max_iter - 1 or i >= min_iter_before_converge:
-            Lambda_flat = Lambda.reshape(-1) if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype).reshape(-1)
-            gw_cost_val = torch.dot(Lambda_flat, T_real.reshape(-1)).item()
+            # Frobenius inner product <Lambda, T>, computed via batched row
+            # dots to avoid N*K temporary and int32 overflow (N*K > 2^31).
+            Lambda_s = Lambda if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype)
+            gw_cost_val = torch.bmm(
+                Lambda_s.unsqueeze(1), T_real.unsqueeze(2)
+            ).sum().item()
             err = err_tensor.item()
             err_list.append(err)
 
@@ -694,7 +698,13 @@ def _gw_loop(
             del D_left, D_tgt, Lambda_gw
 
     # Cast back to float64 for output precision
-    T_out = T_real if T_real.dtype == torch.float64 else T_real.to(torch.float64)
+    if T_real.dtype != torch.float64:
+        try:
+            T_out = T_real.to(torch.float64)
+        except torch.cuda.OutOfMemoryError:
+            T_out = T_real  # keep float32 if float64 copy would OOM
+    else:
+        T_out = T_real
     if differentiable:
         return T_out, err_list, n_iter, gw_cost_val
     return T_out.detach(), err_list, n_iter, gw_cost_val
