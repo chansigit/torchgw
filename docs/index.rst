@@ -48,7 +48,7 @@ single-cell multi-omics integration, and cross-domain graph matching.
 - **Triton fused Sinkhorn** — single-pass online logsumexp, no intermediate N×K matrices
 - **Mixed precision** — float32 Sinkhorn + float64 output, zero quality loss
 - **Smart early stopping** — cost plateau detection, not just transport plan norm
-- **Differentiable** — use GW cost as a training loss with autograd support
+- **Differentiable** — exact gradients via implicit differentiation at the Sinkhorn fixed point
 - **No POT dependency** at runtime — pure PyTorch + scipy + scikit-learn
 
 What's New in v0.4.1
@@ -78,9 +78,16 @@ Installation
 
 .. code-block:: bash
 
-   pip install -e .
+   pip install torchgw
 
-Dependencies: ``numpy``, ``scipy``, ``scikit-learn``, ``torch``, ``joblib``.
+Or for development:
+
+.. code-block:: bash
+
+   git clone https://github.com/chansigit/torchgw.git
+   cd torchgw && pip install -e ".[dev]"
+
+Dependencies: ``numpy``, ``scipy``, ``scikit-learn``, ``torch>=2.0``, ``joblib``.
 Triton (ships with PyTorch 2.0+) enables GPU kernel fusion automatically.
 
 Quick Example

@@ -10,6 +10,12 @@ Installation
    cd torchgw
    pip install -e .
 
+Or from PyPI:
+
+.. code-block:: bash
+
+   pip install torchgw
+
 Requirements: ``numpy``, ``scipy``, ``scikit-learn``, ``torch>=2.0``, ``joblib``.
 Source code: `github.com/chansigit/torchgw <https://github.com/chansigit/torchgw>`_.
 
@@ -80,11 +86,29 @@ For end-to-end training, keep the computation graph:
 
 .. code-block:: python
 
-   T = sampled_gw(X, Y, epsilon=0.005, differentiable=True)
-   # T is differentiable w.r.t. the cost matrix via envelope theorem
+   import torch
+   from torchgw import sampled_gw
 
-Uses a custom ``torch.autograd.Function`` that saves only the transport
-plan (not the full Sinkhorn iteration history), so memory overhead is minimal.
+   C_feat = torch.cdist(encoder(X), encoder(Y))
+
+   # Default: exact gradients via implicit differentiation
+   T = sampled_gw(fgw_alpha=1.0, C_linear=C_feat, differentiable=True)
+   loss = (C_feat.detach() * T).sum()
+   loss.backward()  # exact gradients flow to encoder parameters
+
+   # Alternative: unrolled autograd (higher memory, useful as fallback)
+   T = sampled_gw(fgw_alpha=1.0, C_linear=C_feat,
+                  differentiable=True, grad_mode="unrolled")
+
+The default ``grad_mode="implicit"`` solves the adjoint system at the
+Sinkhorn fixed point for exact gradients with O(NK) memory. See
+:doc:`algorithm` for the mathematical derivation.
+
+.. note::
+
+   ``differentiable=True`` requires ``fgw_alpha > 0`` with a differentiable
+   ``C_linear``.  Pure GW (``fgw_alpha=0``) uses precomputed graph distances
+   that are not part of the computation graph; a warning is emitted in this case.
 
 Joint Embedding
 ---------------
