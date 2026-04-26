@@ -2,6 +2,27 @@
 
 All notable changes to TorchGW are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- `sampled_gw(rho_a, rho_b, semi_relaxed=True)` — fully-unbalanced FGW with
+  two-sided KL marginal damping. PyTorch fallback path only; Triton fast-
+  path falls back to PyTorch when `rho_a != rho_b`. Lowrank
+  (`sampled_lowrank_gw`) raises `NotImplementedError` when `rho_a != rho_b`.
+- Cross-validation test against POT's `sinkhorn_unbalanced` to verify
+  numerical correctness of the new path.
+
+### Changed
+
+- The `rho` kwarg on `sampled_gw` and `sampled_lowrank_gw` is preserved
+  as a backward-compatible alias for legacy single-side semi-relaxed
+  semantics: `rho=X` is equivalent to `rho_a=1.0, rho_b=X` (damping only
+  on the v/target marginal — exactly the pre-PR behavior). New callers
+  should prefer the explicit `(rho_a, rho_b)` form.
+
+---
+
 ## [0.4.1] — 2026-04-09
 
 Exact differentiable gradients via implicit differentiation. Fixes a
