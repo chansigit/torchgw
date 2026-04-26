@@ -425,7 +425,8 @@ def _gw_loop(
     verbose: bool,
     verbose_every: int,
     semi_relaxed: bool,
-    rho: float,
+    rho_a: float,
+    rho_b: float,
     differentiable: bool = False,
     lambda_ema_beta: float | None = None,
     mixed_precision: bool = False,
@@ -551,7 +552,7 @@ def _gw_loop(
             verbose_sink = verbose and (n_iter + 1) % verbose_every == 0
             T_aug = sinkhorn_fn(p_aug_sink, q_aug_sink,
                                 Lambda_aug, current_reg,
-                                semi_relaxed=semi_relaxed, rho=rho,
+                                semi_relaxed=semi_relaxed, rho_a=rho_a, rho_b=rho_b,
                                 verbose=verbose_sink,
                                 log_u_init=_warm_log_u, log_v_init=_warm_log_v,
                                 _inplace_C=True)
@@ -564,7 +565,7 @@ def _gw_loop(
             Lambda_sink = Lambda if Lambda.dtype == sink_dtype else Lambda.to(sink_dtype)
             T_new = sinkhorn_fn(p_sink, q_sink,
                                 Lambda_sink,
-                                current_reg, semi_relaxed=semi_relaxed, rho=rho,
+                                current_reg, semi_relaxed=semi_relaxed, rho_a=rho_a, rho_b=rho_b,
                                 verbose=verbose_sink,
                                 log_u_init=_warm_log_u, log_v_init=_warm_log_v)
             _warm_log_u = getattr(T_new, '_log_u', None)
@@ -730,7 +731,8 @@ def sampled_gw(
     differentiable: bool = False,
     grad_mode: str = "implicit",
     semi_relaxed: bool = False,
-    rho: float = 1.0,
+    rho_a: float = 1.0,
+    rho_b: float = 1.0,
     multiscale: bool = False,
     n_coarse: int | None = None,
     lambda_ema_beta: float | None = None,
@@ -774,8 +776,8 @@ def sampled_gw(
         Memory: O(NK * sinkhorn_iters).
     semi_relaxed : bool
         Relax target marginal via KL penalty.
-    rho : float
-        KL penalty weight (semi_relaxed only).
+    rho_a, rho_b : float
+        KL penalty weights for source and target marginals (semi_relaxed only).
     multiscale : bool
         Two-stage coarse-to-fine warm start.
     n_coarse : int, optional
@@ -826,7 +828,7 @@ def sampled_gw(
                 s_shared=s_shared, M=M, alpha=alpha, max_iter=max_iter, tol=tol,
                 epsilon=epsilon, k=k, min_iter_before_converge=min_iter_before_converge,
                 verbose=False, log=False, differentiable=differentiable,
-                semi_relaxed=semi_relaxed, rho=rho,
+                semi_relaxed=semi_relaxed, rho_a=rho_a, rho_b=rho_b,
             ),
         )
         if T_init is None:
@@ -863,7 +865,7 @@ def sampled_gw(
             M=M, alpha=alpha, max_iter=max_iter, tol=tol,
             epsilon=epsilon, min_iter_before_converge=min_iter_before_converge,
             device=device, verbose=verbose, verbose_every=verbose_every,
-            semi_relaxed=semi_relaxed, rho=rho,
+            semi_relaxed=semi_relaxed, rho_a=rho_a, rho_b=rho_b,
             differentiable=differentiable,
             lambda_ema_beta=lambda_ema_beta,
             mixed_precision=mixed_precision,
@@ -904,7 +906,8 @@ def sampled_lowrank_gw(
     verbose_every: int = 20,
     log: bool = False,
     semi_relaxed: bool = False,
-    rho: float = 1.0,
+    rho_a: float = 1.0,
+    rho_b: float = 1.0,
     multiscale: bool = False,
     n_coarse: int | None = None,
     lambda_ema_beta: float | None = None,
@@ -936,7 +939,8 @@ def sampled_lowrank_gw(
     verbose, verbose_every : progress printing
     log : bool
     semi_relaxed : bool
-    rho : float
+    rho_a, rho_b : float
+        KL penalty weights for source and target marginals (semi_relaxed only).
     multiscale : bool
     n_coarse : int, optional
     lambda_ema_beta : float, optional
@@ -951,6 +955,12 @@ def sampled_lowrank_gw(
     """
     if semi_relaxed:
         raise ValueError("semi_relaxed is not supported for low-rank Sinkhorn")
+    if rho_a != rho_b:
+        raise NotImplementedError(
+            "sampled_lowrank_gw does not yet support rho_a != rho_b "
+            "(low-rank Dykstra requires symmetric KL). Use sampled_gw for "
+            "fully-unbalanced (rho_a, rho_b) FGW."
+        )
 
     from torchgw._lowrank import sinkhorn_lowrank
 
@@ -982,7 +992,7 @@ def sampled_lowrank_gw(
             s_shared=s_shared, M=M, alpha=alpha, max_iter=max_iter, tol=tol,
             epsilon=epsilon, k=k, min_iter_before_converge=min_iter_before_converge,
             verbose=False, log=False,
-            semi_relaxed=semi_relaxed, rho=rho,
+            semi_relaxed=semi_relaxed, rho_a=rho_a, rho_b=rho_b,
         ),
     )
     if T_init is None:
@@ -992,7 +1002,7 @@ def sampled_lowrank_gw(
     C_lin_device = C_linear_t.to(dtype=torch.float64, device=device) if C_linear_t is not None and fgw_alpha > 0 else None
 
     # Wrap sinkhorn_lowrank with fixed rank/iteration params
-    def _lr_sinkhorn(a, b, C, reg, semi_relaxed=False, rho=1.0, verbose=False,
+    def _lr_sinkhorn(a, b, C, reg, semi_relaxed=False, rho_a=1.0, rho_b=1.0, verbose=False,
                      log_u_init=None, log_v_init=None):
         return sinkhorn_lowrank(
             a, b, C, rank=rank, reg=reg,
@@ -1009,7 +1019,7 @@ def sampled_lowrank_gw(
             M=M, alpha=alpha, max_iter=max_iter, tol=tol,
             epsilon=epsilon, min_iter_before_converge=min_iter_before_converge,
             device=device, verbose=verbose, verbose_every=verbose_every,
-            semi_relaxed=False, rho=rho,
+            semi_relaxed=False, rho_a=rho_a, rho_b=rho_b,
             lambda_ema_beta=lambda_ema_beta,
             mixed_precision=mixed_precision,
         )

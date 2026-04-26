@@ -400,7 +400,7 @@ def test_semi_relaxed(two_datasets):
     X_src, X_tgt = two_datasets
     T = sampled_gw(
         X_src, X_tgt,
-        semi_relaxed=True, rho=1.0,
+        semi_relaxed=True, rho_a=1.0, rho_b=1.0,
         s_shared=50, M=30, max_iter=10,
     )
     assert T.shape == (150, 150)
